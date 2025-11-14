@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<title>股票指標觀測平台</title>
+<style>
+    body {
+        font-family: "Segoe UI", sans-serif;
+        background: #f5f5f5;
+        padding: 20px;
+    }
+    h2 {
+        margin-top: 40px;
+        color: #333;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+        margin-top: 10px;
+        border-radius: 8px;
+        overflow: hidden;
+        table-layout: fixed;  /* 固定表格佈局，確保欄位寬度一致 */
+    }
+    th, td {
+        padding: 12px;
+        text-align: center;
+        border-bottom: 1px solid #eee;
+        word-wrap: break-word;  /* 長文字自動換行 */
+    }
+    th {
+        background: #4CAF50;
+        color: white;
+    }
+    th:first-child, td:first-child {
+        width: 12%;  /* 股票市場欄位固定寬度 */
+        font-weight: bold;
+    }
+    th:not(:first-child), td:not(:first-child) {
+        width: 11%;  /* 其他欄位平均分配剩餘寬度 */
+    }
+    /* 超買超賣顏色標示 */
+    .overbought {
+        background-color: #ffebee;
+        color: #c62828;
+        font-weight: bold;
+    }
+    .oversold {
+        background-color: #e8f5e9;
+        color: #2e7d32;
+        font-weight: bold;
+    }
+    /* MA 趨勢顏色標示 */
+    .trend-up {
+        background-color: #ffebee;
+        color: #c62828;
+        font-weight: bold;
+    }
+    .trend-down {
+        background-color: #e8f5e9;
+        color: #2e7d32;
+        font-weight: bold;
+    }
+    /* 教學區塊樣式 */
+    .tutorial-section {
+        margin-top: 60px;
+        padding: 30px;
+        background: #fff;
+        border-radius: 8px;
+        line-height: 1.8;
+    }
+    .tutorial-section h2 {
+        color: #333;
+        margin-top: 0;
+        margin-bottom: 20px;
+    }
+    .tutorial-section h3 {
+        color: #4CAF50;
+        margin-top: 30px;
+        margin-bottom: 15px;
+    }
+    .tutorial-section ul {
+        margin-left: 20px;
+    }
+    .tutorial-section li {
+        margin-bottom: 8px;
+    }
+    .tutorial-section .warning {
+        color: #f57c00;
+        font-weight: bold;
+    }
+</style>
+</head>
+<body>
+
+<h1>📈 股票指標觀測平台</h1>
+<p>每日自動更新昨日收盤價與技術指標（由 GitHub Actions 自動生成）</p>
+
+<table id="stock-table">
+    <thead>
+        <tr>
+            <th>股票市場</th>
+            <th>收盤價</th>
+            <th>市盈率 (PE)</th>
+            <th>K 值</th>
+            <th>D 值</th>
+            <th>RSI</th>
+            <th>月線 (20MA)</th>
+            <th>半年線 (120MA)</th>
+            <th>年線 (240MA)</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<script>
+// 讀取自動更新的 data.json
+fetch("data.json?ts=" + Date.now())      // 避免 GitHub Cache
+  .then(res => {
+    if (!res.ok) {
+      throw new Error('無法載入數據');
+    }
+    return res.json();
+  })
+  .then(data => {
+    renderTable(data);
+  })
+  .catch(error => {
+    console.error('載入數據失敗:', error);
+    const tbody = document.querySelector("#stock-table tbody");
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">無法載入數據，請稍後再試</td></tr>';
+  });
+
+function renderTable(data) {
+    const formatNumber = (num) => num != null ? num.toFixed(1) : 'N/A';
+    const tbody = document.querySelector("#stock-table tbody");
+    
+    // 定義所有股票（按順序）
+    const stocks = [
+        { key: "twii", name: "台股加權 (TWII)" },
+        { key: "tsmc", name: "台積電 (TSMC)" },
+        { key: "etf0050", name: "元大台灣50 (0050)" },
+        { key: "etf00631l", name: "元大台灣50正2 (00631L)" },
+        { key: "etf00675l", name: "富邦台50正2 (00675L)" },
+        { key: "etf00670l", name: "富邦台50正2 (00670L)" },
+        { key: "nasdaq", name: "NASDAQ (IXIC)" },
+        { key: "tqqq", name: "ProShares UltraPro QQQ (TQQQ)" },
+        { key: "nvda", name: "NVIDIA (NVDA)" },
+        { key: "msft", name: "Microsoft (MSFT)" },
+        { key: "goog", name: "Google (GOOG)" },
+        { key: "tsla", name: "Tesla (TSLA)" },
+        { key: "smh", name: "SMH ETF" },
+        { key: "aapl", name: "Apple (AAPL)" },
+        { key: "amzn", name: "Amazon (AMZN)" },
+        { key: "meta", name: "Meta (META)" },
+        { key: "btc", name: "Bitcoin (BTC)" },
+        { key: "gld", name: "Gold ETF (GLD)" },
+    ];
+    
+    // 判斷超買超賣的函數
+    function getKDClass(k, d) {
+        if (k != null && d != null && !isNaN(k) && !isNaN(d)) {
+            if (k > 80 || d > 80) return 'overbought';
+            if (k < 20 || d < 20) return 'oversold';
+        }
+        return '';
+    }
+    
+    function getRSIClass(rsi) {
+        if (rsi != null && !isNaN(rsi)) {
+            if (rsi > 70) return 'overbought';
+            if (rsi < 30) return 'oversold';
+        }
+        return '';
+    }
+    
+    // 判斷 MA 趨勢的函數
+    function getMAClass(close, ma) {
+        if (close != null && ma != null && !isNaN(close) && !isNaN(ma)) {
+            if (close > ma) return 'trend-up';
+            if (close < ma) return 'trend-down';
+        }
+        return '';
+    }
+    
+    // 清空 tbody 避免重複
+    tbody.innerHTML = '';
+    
+    // 動態渲染所有股票資料
+    stocks.forEach(stock => {
+        const stockData = data[stock.key];
+        if (stockData) {
+            const kClass = getKDClass(stockData.k, stockData.d);
+            const dClass = getKDClass(stockData.k, stockData.d);
+            const rsiClass = getRSIClass(stockData.rsi);
+            const ma20Class = getMAClass(stockData.close, stockData.ma20);
+            const ma120Class = getMAClass(stockData.close, stockData.ma120);
+            const ma240Class = getMAClass(stockData.close, stockData.ma240);
+            
+            // 調試用（可在瀏覽器控制台查看）
+            if (kClass || dClass || rsiClass || ma20Class || ma120Class || ma240Class) {
+                console.log(`${stock.name}: K=${kClass}, D=${dClass}, RSI=${rsiClass}, MA20=${ma20Class}, MA120=${ma120Class}, MA240=${ma240Class}`);
+            }
+            
+            tbody.innerHTML += `
+                <tr>
+                    <td>${stock.name}</td>
+                    <td>${formatNumber(stockData.close)}</td>
+                    <td>${stockData.pe != null ? stockData.pe.toFixed(1) : 'N/A'}</td>
+                    <td class="${kClass}">${formatNumber(stockData.k)}</td>
+                    <td class="${dClass}">${formatNumber(stockData.d)}</td>
+                    <td class="${rsiClass}">${formatNumber(stockData.rsi)}</td>
+                    <td class="${ma20Class}">${formatNumber(stockData.ma20)}</td>
+                    <td class="${ma120Class}">${formatNumber(stockData.ma120)}</td>
+                    <td class="${ma240Class}">${formatNumber(stockData.ma240)}</td>
+                </tr>
+            `;
+        }
+    });
+}
+</script>
+
+<div class="tutorial-section">
+    <h2>📚 技術指標教學</h2>
+    
+    <h3>1️⃣ RSI（Relative Strength Index，相對強弱指標）</h3>
+    <p><strong>計算概念：</strong>RSI 是衡量一段時間內價格上漲與下跌的強弱比，通常用 14日 RSI。</p>
+    <ul>
+        <li>RSI = 100 × (平均漲幅 / (平均漲幅 + 平均跌幅))</li>
+        <li>值範圍：0~100</li>
+    </ul>
+    <p><strong>解讀方式：</strong></p>
+    <ul>
+        <li>RSI > 70 → <span class="overbought" style="display: inline-block; padding: 2px 8px;">超買</span>，股價可能短期過高，需注意回調</li>
+        <li>RSI < 30 → <span class="oversold" style="display: inline-block; padding: 2px 8px;">超賣</span>，股價可能短期過低，可能出現反彈</li>
+        <li>50 附近 → 市場中性，沒有明顯趨勢</li>
+    </ul>
+    <p class="warning">⚠️ 注意：RSI 高不一定立刻跌，RSI 低也不一定立刻漲，它偏向趨勢強弱參考。</p>
+    
+    <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+    
+    <h3>2️⃣ K, D 值（隨機指標 Stochastic Oscillator）</h3>
+    <p><strong>計算概念：</strong>用最高價、最低價與收盤價之間的位置，衡量股價動能。</p>
+    <ul>
+        <li>K = （當日收盤價 - N日最低價） / (N日最高價 - N日最低價) × 100</li>
+        <li>D = K 的 N 日移動平均</li>
+    </ul>
+    <p><strong>解讀方式：</strong></p>
+    <ul>
+        <li>K 或 D > 80 → <span class="overbought" style="display: inline-block; padding: 2px 8px;">超買區</span>，可能反轉向下</li>
+        <li>K 或 D < 20 → <span class="oversold" style="display: inline-block; padding: 2px 8px;">超賣區</span>，可能反轉向上</li>
+        <li>K 與 D 黃金交叉（K 上穿 D） → 買訊</li>
+        <li>K 與 D 死亡交叉（K 下穿 D） → 賣訊</li>
+    </ul>
+    <p>K, D 對短期價格動作比較敏感，比 RSI 更適合捕捉短線波動。</p>
+    
+    <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+    
+    <h3>3️⃣ MA（Moving Average，移動平均線）</h3>
+    <ul>
+        <li>MA20 → 20日平均線 → 短期趨勢</li>
+        <li>MA120 → 120日平均線 → 中期趨勢</li>
+        <li>MA240 → 240日平均線 → 長期趨勢</li>
+    </ul>
+    <p><strong>解讀方式：</strong></p>
+    <ul>
+        <li>價格 > MA → <span class="trend-up" style="display: inline-block; padding: 2px 8px;">上漲趨勢</span></li>
+        <li>價格 < MA → <span class="trend-down" style="display: inline-block; padding: 2px 8px;">下跌趨勢</span></li>
+        <li>MA 短期上穿長期 → 多頭訊號（黃金交叉）</li>
+        <li>MA 短期下穿長期 → 空頭訊號（死亡交叉）</li>
+    </ul>
+    <p><strong>搭配使用：</strong></p>
+    <ul>
+        <li>MA20 與 MA120/MA240 比較，可看短期趨勢與中長期趨勢是否一致</li>
+        <li>例如：價格突破 MA20 且 MA20 > MA120 → 短期上攻可能延續</li>
+    </ul>
+</div>
+
+</body>
+</html>
