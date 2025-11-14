@@ -21,6 +21,12 @@ def compute(df, ticker):
     df['MA240'] = talib.SMA(df['Close'], timeperiod=240)
 
     last = df.iloc[-1]
+    prev = df.iloc[-2] if len(df) > 1 else last  # 前一日數據
+    
+    # 計算今日漲跌幅
+    change_percent = None
+    if len(df) > 1 and prev['Close'] > 0:
+        change_percent = ((last['Close'] - prev['Close']) / prev['Close']) * 100
     
     # 嘗試獲取本益比 (P/E ratio)
     pe = None
@@ -35,6 +41,7 @@ def compute(df, ticker):
     
     return {
         "close": float(last['Close']),
+        "change_percent": change_percent,
         "pe": pe,
         "rsi": float(last['RSI']),
         "k": float(last['K']),
@@ -51,9 +58,9 @@ stocks_config = [
     {"key": "etf0050", "symbol": "0050.TW", "name": "元大台灣50 (0050)"},
     {"key": "etf00631l", "symbol": "00631L.TW", "name": "元大台灣50正2 (00631L)"},
     {"key": "etf00675l", "symbol": "00675L.TW", "name": "富邦台50正2 (00675L)"},
-    {"key": "etf00670l", "symbol": "00670L.TW", "name": "富邦台50正2 (00670L)"},
     {"key": "nasdaq", "symbol": "^IXIC", "name": "NASDAQ (IXIC)"},
     {"key": "tqqq", "symbol": "TQQQ", "name": "ProShares UltraPro QQQ (TQQQ)"},
+    {"key": "qld", "symbol": "QLD", "name": "ProShares Ultra QQQ (QLD)"},
     {"key": "nvda", "symbol": "NVDA", "name": "NVIDIA (NVDA)"},
     {"key": "msft", "symbol": "MSFT", "name": "Microsoft (MSFT)"},
     {"key": "goog", "symbol": "GOOG", "name": "Google (GOOG)"},
@@ -79,6 +86,7 @@ for stock in stocks_config:
         # 如果獲取失敗，使用空數據
         data[stock["key"]] = {
             "close": None,
+            "change_percent": None,
             "pe": None,
             "rsi": None,
             "k": None,

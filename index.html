@@ -33,11 +33,18 @@
         color: white;
     }
     th:first-child, td:first-child {
-        width: 12%;  /* 股票市場欄位固定寬度 */
+        width: 11%;  /* 股票市場欄位固定寬度 */
         font-weight: bold;
     }
-    th:not(:first-child), td:not(:first-child) {
-        width: 11%;  /* 其他欄位平均分配剩餘寬度 */
+    th:nth-child(2), td:nth-child(2) {
+        width: 9%;  /* 收盤價欄位 */
+    }
+    th:nth-child(3), td:nth-child(3) {
+        width: 9%;  /* 漲跌幅欄位 */
+    }
+    th:not(:first-child):not(:nth-child(2)):not(:nth-child(3)), 
+    td:not(:first-child):not(:nth-child(2)):not(:nth-child(3)) {
+        width: 8%;  /* 其他欄位平均分配剩餘寬度 */
     }
     /* 超買超賣顏色標示 */
     .overbought {
@@ -58,6 +65,15 @@
     }
     .trend-down {
         background-color: #e8f5e9;
+        color: #2e7d32;
+        font-weight: bold;
+    }
+    /* 漲跌幅顏色標示 */
+    .price-up {
+        color: #c62828;
+        font-weight: bold;
+    }
+    .price-down {
         color: #2e7d32;
         font-weight: bold;
     }
@@ -101,6 +117,7 @@
         <tr>
             <th>股票市場</th>
             <th>收盤價</th>
+            <th>今日漲跌幅</th>
             <th>市盈率 (PE)</th>
             <th>K 值</th>
             <th>D 值</th>
@@ -128,7 +145,7 @@ fetch("data.json?ts=" + Date.now())      // 避免 GitHub Cache
   .catch(error => {
     console.error('載入數據失敗:', error);
     const tbody = document.querySelector("#stock-table tbody");
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">無法載入數據，請稍後再試</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 20px;">無法載入數據，請稍後再試</td></tr>';
   });
 
 function renderTable(data) {
@@ -142,9 +159,9 @@ function renderTable(data) {
         { key: "etf0050", name: "元大台灣50 (0050)" },
         { key: "etf00631l", name: "元大台灣50正2 (00631L)" },
         { key: "etf00675l", name: "富邦台50正2 (00675L)" },
-        { key: "etf00670l", name: "富邦台50正2 (00670L)" },
         { key: "nasdaq", name: "NASDAQ (IXIC)" },
         { key: "tqqq", name: "ProShares UltraPro QQQ (TQQQ)" },
+        { key: "qld", name: "ProShares Ultra QQQ (QLD)" },
         { key: "nvda", name: "NVIDIA (NVDA)" },
         { key: "msft", name: "Microsoft (MSFT)" },
         { key: "goog", name: "Google (GOOG)" },
@@ -183,6 +200,17 @@ function renderTable(data) {
         return '';
     }
     
+    // 格式化漲跌幅並返回顏色類別
+    function formatChangePercent(changePercent) {
+        if (changePercent == null || isNaN(changePercent)) {
+            return { text: 'N/A', class: '' };
+        }
+        const sign = changePercent >= 0 ? '+' : '';
+        const text = `${sign}${changePercent.toFixed(1)}%`;
+        const className = changePercent >= 0 ? 'price-up' : 'price-down';
+        return { text, class: className };
+    }
+    
     // 清空 tbody 避免重複
     tbody.innerHTML = '';
     
@@ -197,6 +225,9 @@ function renderTable(data) {
             const ma120Class = getMAClass(stockData.close, stockData.ma120);
             const ma240Class = getMAClass(stockData.close, stockData.ma240);
             
+            // 格式化漲跌幅
+            const changeInfo = formatChangePercent(stockData.change_percent);
+            
             // 調試用（可在瀏覽器控制台查看）
             if (kClass || dClass || rsiClass || ma20Class || ma120Class || ma240Class) {
                 console.log(`${stock.name}: K=${kClass}, D=${dClass}, RSI=${rsiClass}, MA20=${ma20Class}, MA120=${ma120Class}, MA240=${ma240Class}`);
@@ -206,6 +237,7 @@ function renderTable(data) {
                 <tr>
                     <td>${stock.name}</td>
                     <td>${formatNumber(stockData.close)}</td>
+                    <td class="${changeInfo.class}">${changeInfo.text}</td>
                     <td>${stockData.pe != null ? stockData.pe.toFixed(1) : 'N/A'}</td>
                     <td class="${kClass}">${formatNumber(stockData.k)}</td>
                     <td class="${dClass}">${formatNumber(stockData.d)}</td>
